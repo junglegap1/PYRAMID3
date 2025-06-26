@@ -1,51 +1,71 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, ChangeEvent } from "react";
 import { db } from "./firebase";
 import {
   collection,
   doc,
   setDoc,
-  getDoc,
   getDocs,
-  updateDoc,
   onSnapshot,
   addDoc,
 } from "firebase/firestore";
 
-const defaultPhotos = {
+// 👤 Define profiles and default photos
+const profiles = ["Nick", "Charli", "Shelma"] as const;
+type ProfileName = (typeof profiles)[number];
+
+const defaultPhotos: Record<ProfileName, string> = {
   Nick: "https://i.pravatar.cc/100?img=1",
   Charli: "https://i.pravatar.cc/100?img=2",
   Shelma: "https://i.pravatar.cc/100?img=3",
 };
 
-const profiles = ["Nick", "Charli", "Shelma"];
+// 🔠 Types
+type PhotoMap = Record<string, string>;
+type VotesMap = Record<string, string>;
+type Pyramid = {
+  round: number;
+  timestamp: string;
+  ranking: string[];
+};
 
 export default function BehaviorPyramidApp() {
-  const [currentUser, setCurrentUser] = useState("");
-  const [photos, setPhotos] = useState(defaultPhotos);
-  const [votes, setVotes] = useState({});
-  const [history, setHistory] = useState([]);
+  const [currentUser, setCurrentUser] = useState<ProfileName | "">("");
+  const [photos, setPhotos] = useState<PhotoMap>(defaultPhotos);
+  const [votes, setVotes] = useState<VotesMap>({});
+  const [history, setHistory] = useState<Pyramid[]>([]);
 
-  // 🔄 Load from Firestore on start
+  // 🔄 Load Firestore data
   useEffect(() => {
     const unsubPhotos = onSnapshot(collection(db, "photos"), (snapshot) => {
-      const data = {};
-      snapshot.forEach((doc) => (data[doc.id] = doc.data().photo));
+      const data: PhotoMap = {};
+      snapshot.forEach((doc) => {
+        const d = doc.data();
+        if (typeof d.photo === "string") {
+          data[doc.id] = d.photo;
+        }
+      });
       setPhotos((prev) => ({ ...defaultPhotos, ...data }));
     });
 
     const unsubVotes = onSnapshot(collection(db, "votes"), (snapshot) => {
-      const data = {};
-      snapshot.forEach((doc) => (data[doc.id] = doc.data().votedFor));
+      const data: VotesMap = {};
+      snapshot.forEach((doc) => {
+        const d = doc.data();
+        if (typeof d.votedFor === "string") {
+          data[doc.id] = d.votedFor;
+        }
+      });
       setVotes(data);
     });
 
     const loadHistory = async () => {
       const snap = await getDocs(collection(db, "pyramids"));
-      const data = snap.docs
-        .map((doc) => doc.data())
+      const data: Pyramid[] = snap.docs
+        .map((doc) => doc.data() as Pyramid)
         .sort((a, b) => a.round - b.round);
       setHistory(data);
     };
+
     loadHistory();
 
     return () => {
@@ -54,38 +74,44 @@ export default function BehaviorPyramidApp() {
     };
   }, []);
 
-  // 📸 Upload Photo (base64)
-  const onPhotoChange = (profile, e) => {
-    const file = e.target.files[0];
+  // 📸 Upload photo
+  const onPhotoChange = (profile: string, e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = reader.result;
-      await setDoc(doc(db, "photos", profile), { photo: base64 });
+      if (typeof base64 === "string") {
+        await setDoc(doc(db, "photos", profile), { photo: base64 });
+      }
     };
     reader.readAsDataURL(file);
   };
 
   const allVoted = profiles.every((p) => votes[p]);
 
-  const computeRanking = () => {
-    const count = {};
+  const computeRanking = (): string[] => {
+    const count: Record<string, number> = {};
     profiles.forEach((p) => (count[p] = 0));
     Object.values(votes).forEach((v) => {
       if (count[v] !== undefined) count[v]++;
     });
-    return profiles.slice().sort((a, b) => count[b] - count[a]);
+    return [...profiles].sort((a, b) => count[b] - count[a]);
   };
 
   const ranking = computeRanking();
 
-  const castVote = async (votedFor) => {
+  const castVote = async (votedFor: string) => {
     if (!currentUser) return alert("Please select your profile first!");
     if (votedFor === currentUser)
       return alert("You cannot vote for yourself!");
 
     const prevVote = votes[currentUser];
-    if (prevVote && !window.confirm(`Change vote from ${prevVote} to ${votedFor}?`)) {
+    if (
+      prevVote &&
+      !window.confirm(`Change vote from ${prevVote} to ${votedFor}?`)
+    ) {
       return;
     }
 
@@ -94,16 +120,17 @@ export default function BehaviorPyramidApp() {
 
   const startNewRound = async () => {
     if (!allVoted) return alert("Everyone must vote first.");
-    const newPyramid = {
+    const newPyramid: Pyramid = {
       round: history.length + 1,
       timestamp: new Date().toLocaleString(),
       ranking,
     };
     await addDoc(collection(db, "pyramids"), newPyramid);
 
-    // Reset votes
     const voteDocs = await getDocs(collection(db, "votes"));
-    voteDocs.forEach(async (d) => await setDoc(doc(db, "votes", d.id), {}));
+    voteDocs.forEach(async (d) => {
+      await setDoc(doc(db, "votes", d.id), {});
+    });
   };
 
   return (
@@ -129,7 +156,10 @@ export default function BehaviorPyramidApp() {
         <>
           <div style={{ marginBottom: 20 }}>
             <strong>You are:</strong> {currentUser}{" "}
-            <button onClick={() => setCurrentUser("")} style={{ marginLeft: 10 }}>
+            <button
+              onClick={() => setCurrentUser("")}
+              style={{ marginLeft: 10 }}
+            >
               Change
             </button>
           </div>
@@ -146,7 +176,11 @@ export default function BehaviorPyramidApp() {
                 marginBottom: 8,
               }}
             />
-            <input type="file" accept="image/*" onChange={(e) => onPhotoChange(currentUser, e)} />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => onPhotoChange(currentUser, e)}
+            />
           </div>
 
           <div>
@@ -162,7 +196,8 @@ export default function BehaviorPyramidApp() {
                     marginRight: 8,
                     marginBottom: 8,
                     padding: "8px 16px",
-                    backgroundColor: votes[currentUser] === p ? "green" : "gray",
+                    backgroundColor:
+                      votes[currentUser] === p ? "green" : "gray",
                     color: "white",
                     border: "none",
                     borderRadius: 4,
@@ -181,7 +216,9 @@ export default function BehaviorPyramidApp() {
           <div style={{ marginTop: 30, textAlign: "center" }}>
             <h3>
               Current Pyramid {history.length + 1}{" "}
-              {allVoted ? "(All voted! Ready to start next round)" : "(Voting in progress)"}
+              {allVoted
+                ? "(All voted! Ready to start next round)"
+                : "(Voting in progress)"}
             </h3>
 
             <div>
@@ -196,10 +233,19 @@ export default function BehaviorPyramidApp() {
                     border: "4px solid gold",
                   }}
                 />
-                <div style={{ fontWeight: "bold", marginTop: 6 }}>{ranking[0]}</div>
+                <div style={{ fontWeight: "bold", marginTop: 6 }}>
+                  {ranking[0]}
+                </div>
               </div>
 
-              <div style={{ marginTop: 20, display: "flex", justifyContent: "center", gap: 20 }}>
+              <div
+                style={{
+                  marginTop: 20,
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: 20,
+                }}
+              >
                 {[ranking[1], ranking[2]].map((p) => (
                   <div key={p}>
                     <img
