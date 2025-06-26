@@ -41,7 +41,7 @@ export default function BehaviorPyramidApp() {
   }, [history]);
 
   // Handle photo upload for profile
-  const onPhotoChange = (profile, e) => {
+  const onPhotoChange = (profile: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
