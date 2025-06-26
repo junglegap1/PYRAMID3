@@ -1,31 +1,40 @@
 import React, { useState, useEffect } from "react";
 
-type PhotosType = {
-  [key: string]: string | ArrayBuffer | null;
-};
+type ProfileName = "Nick" | "Charli" | "Shelma";
 
-const defaultPhotos = {
+const defaultPhotos: Record<ProfileName, string> = {
   Nick: "https://i.pravatar.cc/100?img=1",
   Charli: "https://i.pravatar.cc/100?img=2",
   Shelma: "https://i.pravatar.cc/100?img=3",
 };
 
-const profiles = ["Nick", "Charli", "Shelma"];
+const profiles: ProfileName[] = ["Nick", "Charli", "Shelma"];
+
+type Votes = Partial<Record<ProfileName, ProfileName>>;
+
+type PyramidHistoryEntry = {
+  round: number;
+  timestamp: string;
+  ranking: ProfileName[];
+};
 
 export default function BehaviorPyramidApp() {
   // Load saved data from localStorage or init fresh
-  const [currentUser, setCurrentUser] = useState(
-    localStorage.getItem("bp-currentUser") || ""
+  const [currentUser, setCurrentUser] = useState<ProfileName | "">(
+    (localStorage.getItem("bp-currentUser") as ProfileName) || ""
   );
-  const [photos, setPhotos] = useState<PhotosType>(() => {
+
+  const [photos, setPhotos] = useState<Record<ProfileName, string>>(() => {
     const saved = localStorage.getItem("bp-photos");
     return saved ? JSON.parse(saved) : defaultPhotos;
   });
-  const [votes, setVotes] = useState(() => {
+
+  const [votes, setVotes] = useState<Votes>(() => {
     const saved = localStorage.getItem("bp-votes");
     return saved ? JSON.parse(saved) : {};
   });
-  const [history, setHistory] = useState(() => {
+
+  const [history, setHistory] = useState<PyramidHistoryEntry[]>(() => {
     const saved = localStorage.getItem("bp-history");
     return saved ? JSON.parse(saved) : [];
   });
@@ -34,19 +43,22 @@ export default function BehaviorPyramidApp() {
   useEffect(() => {
     localStorage.setItem("bp-votes", JSON.stringify(votes));
   }, [votes]);
+
   useEffect(() => {
     localStorage.setItem("bp-photos", JSON.stringify(photos));
   }, [photos]);
+
   useEffect(() => {
     localStorage.setItem("bp-currentUser", currentUser);
   }, [currentUser]);
+
   useEffect(() => {
     localStorage.setItem("bp-history", JSON.stringify(history));
   }, [history]);
 
   // Handle photo upload for profile
   const onPhotoChange = (
-    profile: string,
+    profile: ProfileName,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const files = e.target.files;
@@ -54,7 +66,7 @@ export default function BehaviorPyramidApp() {
     const file = files[0];
     const reader = new FileReader();
     reader.onloadend = () => {
-      setPhotos((p: PhotosType) => ({ ...p, [profile]: reader.result }));
+      setPhotos((p) => ({ ...p, [profile]: reader.result as string }));
     };
     reader.readAsDataURL(file);
   };
@@ -63,18 +75,22 @@ export default function BehaviorPyramidApp() {
   const allVoted = profiles.every((p) => votes[p]);
 
   // Compute current ranking based on votes
-  const computeRanking = () => {
-    const count: { [key: string]: number } = {};
-    profiles.forEach((p) => (count[p] = 0));
+  const computeRanking = (): ProfileName[] => {
+    const count: Record<ProfileName, number> = {
+      Nick: 0,
+      Charli: 0,
+      Shelma: 0,
+    };
     Object.values(votes).forEach((v) => {
-      if (count[v] !== undefined) count[v]++;
+      if (v && count[v] !== undefined) count[v]++;
     });
     return profiles.slice().sort((a, b) => count[b] - count[a]);
   };
+
   const ranking = computeRanking();
 
   // Cast vote for current user
-  const castVote = (votedFor: string) => {
+  const castVote = (votedFor: ProfileName) => {
     if (!currentUser) {
       alert("Please select your profile first!");
       return;
@@ -100,7 +116,7 @@ export default function BehaviorPyramidApp() {
       alert("All profiles must vote before starting a new round.");
       return;
     }
-    const newPyramid = {
+    const newPyramid: PyramidHistoryEntry = {
       round: history.length + 1,
       timestamp: new Date().toLocaleString(),
       ranking,
@@ -110,7 +126,9 @@ export default function BehaviorPyramidApp() {
   };
 
   return (
-    <div style={{ maxWidth: 360, margin: "auto", fontFamily: "Arial, sans-serif" }}>
+    <div
+      style={{ maxWidth: 360, margin: "auto", fontFamily: "Arial, sans-serif" }}
+    >
       <h1 style={{ textAlign: "center" }}>Best Behaved Voting</h1>
 
       {/* Profile selector */}
@@ -141,7 +159,7 @@ export default function BehaviorPyramidApp() {
           {/* Photo upload */}
           <div style={{ marginBottom: 20 }}>
             <img
-              src={photos[currentUser] as string}
+              src={photos[currentUser]}
               alt={currentUser}
               style={{
                 width: 100,
@@ -172,7 +190,8 @@ export default function BehaviorPyramidApp() {
                     marginRight: 8,
                     marginBottom: 8,
                     padding: "8px 16px",
-                    backgroundColor: votes[currentUser] === p ? "green" : "gray",
+                    backgroundColor:
+                      votes[currentUser] === p ? "green" : "gray",
                     color: "white",
                     cursor: votes[currentUser] === p ? "default" : "pointer",
                     border: "none",
@@ -203,7 +222,7 @@ export default function BehaviorPyramidApp() {
               {/* Top */}
               <div>
                 <img
-                  src={photos[ranking[0]] as string}
+                  src={photos[ranking[0]]}
                   alt={ranking[0]}
                   style={{
                     width: 120,
@@ -212,7 +231,9 @@ export default function BehaviorPyramidApp() {
                     border: "4px solid gold",
                   }}
                 />
-                <div style={{ fontWeight: "bold", marginTop: 6 }}>{ranking[0]}</div>
+                <div style={{ fontWeight: "bold", marginTop: 6 }}>
+                  {ranking[0]}
+                </div>
               </div>
 
               {/* Bottom row */}
@@ -227,7 +248,7 @@ export default function BehaviorPyramidApp() {
                 {[ranking[1], ranking[2]].map((p) => (
                   <div key={p}>
                     <img
-                      src={photos[p] as string}
+                      src={photos[p]}
                       alt={p}
                       style={{
                         width: 80,
@@ -270,38 +291,18 @@ export default function BehaviorPyramidApp() {
                 <li key={round} style={{ marginBottom: 10 }}>
                   <strong>Pyramid {round}</strong> - <em>{timestamp}</em>
                   <div style={{ display: "flex", marginTop: 5, gap: 10 }}>
-                    {/* Show pyramid with photos */}
-                    <div style={{ textAlign: "center" }}>
+                    {ranking.map((p) => (
                       <img
-                        src={photos[ranking[0]] as string}
-                        alt={ranking[0]}
+                        key={p}
+                        src={photos[p]}
+                        alt={p}
                         style={{
-                          width: 60,
-                          height: 60,
+                          width: 40,
+                          height: 40,
                           borderRadius: "50%",
-                          border: "3px solid gold",
-                          display: "block",
-                          margin: "auto",
+                          border: "1px solid gray",
                         }}
                       />
-                      <div style={{ fontWeight: "bold" }}>{ranking[0]}</div>
-                    </div>
-                    {[ranking[1], ranking[2]].map((p) => (
-                      <div key={p} style={{ textAlign: "center" }}>
-                        <img
-                          src={photos[p] as string}
-                          alt={p}
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: "50%",
-                            border: "2px solid gray",
-                            display: "block",
-                            margin: "auto",
-                          }}
-                        />
-                        <div>{p}</div>
-                      </div>
                     ))}
                   </div>
                 </li>
