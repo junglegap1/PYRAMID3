@@ -1,6 +1,5 @@
-// src/firebase.ts
 import { initializeApp } from "firebase/app";
-import { getStorage } from "firebase/storage";  // import storage service if you want to use storage
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAqkcQyUzvWC8BuSYGY54QBjaRLl18urcM",
@@ -11,10 +10,11 @@ const firebaseConfig = {
   appId: "1:553574468724:web:397b7fe78610f319685521"
 };
 
-// Initialize Firebase
+// Initialize Firebase app
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Storage and export it
-const storage = getStorage(app);
+// Initialize Firestore
+const db = getFirestore(app);
 
-export { app, storage };
+// Export both so you can import them later
+export { app, db };
