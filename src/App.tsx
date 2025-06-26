@@ -1,7 +1,8 @@
+// src/App.tsx
 import React, { useEffect, useState } from "react";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db, storage } from "./firebase"; // ← adjust the path if needed
+import { db, storage } from "./firebase"; // Adjust path if needed
 
 type ProfileName = "Nick" | "Charli" | "Shelma";
 
@@ -33,12 +34,21 @@ export default function BehaviorPyramidApp() {
   // Load profile photos from Firestore
   useEffect(() => {
     const loadPhotos = async () => {
-      const docRef = doc(db, "photos", "profiles");
-      const snapshot = await getDoc(docRef);
-      if (snapshot.exists()) {
-        setPhotos(snapshot.data() as Record<ProfileName, string>);
-      } else {
-        // fallback avatars
+      try {
+        const docRef = doc(db, "photos", "profiles");
+        const snapshot = await getDoc(docRef);
+        if (snapshot.exists()) {
+          setPhotos(snapshot.data() as Record<ProfileName, string>);
+        } else {
+          // fallback avatars
+          setPhotos({
+            Nick: "https://i.pravatar.cc/100?img=1",
+            Charli: "https://i.pravatar.cc/100?img=2",
+            Shelma: "https://i.pravatar.cc/100?img=3",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to load photos:", error);
         setPhotos({
           Nick: "https://i.pravatar.cc/100?img=1",
           Charli: "https://i.pravatar.cc/100?img=2",
@@ -68,15 +78,20 @@ export default function BehaviorPyramidApp() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const fileRef = ref(storage, `profile_photos/${profile}.jpg`);
-    await uploadBytes(fileRef, file);
-    const downloadURL = await getDownloadURL(fileRef);
+    try {
+      const fileRef = ref(storage, `profile_photos/${profile}.jpg`);
+      await uploadBytes(fileRef, file);
+      const downloadURL = await getDownloadURL(fileRef);
 
-    const updatedPhotos = { ...photos, [profile]: downloadURL };
-    setPhotos(updatedPhotos);
+      const updatedPhotos = { ...photos, [profile]: downloadURL };
+      setPhotos(updatedPhotos);
 
-    // save new URL to Firestore
-    await setDoc(doc(db, "photos", "profiles"), updatedPhotos);
+      // save new URL to Firestore
+      await setDoc(doc(db, "photos", "profiles"), updatedPhotos);
+    } catch (error) {
+      alert("Failed to upload photo. Please try again.");
+      console.error("Photo upload error:", error);
+    }
   };
 
   const allVoted = profiles.every((p) => votes[p]);
@@ -97,7 +112,8 @@ export default function BehaviorPyramidApp() {
 
   const castVote = (votedFor: ProfileName) => {
     if (!currentUser) return alert("Please select your profile first!");
-    if (votedFor === currentUser) return alert("You cannot vote for yourself!");
+    if (votedFor === currentUser)
+      return alert("You cannot vote for yourself!");
     if (votes[currentUser]) {
       if (
         !window.confirm(
@@ -123,8 +139,19 @@ export default function BehaviorPyramidApp() {
     setVotes({});
   };
 
+  // Fallback photo helper
+  const getPhotoUrl = (profile: ProfileName) =>
+    photos[profile] || `https://i.pravatar.cc/100?u=${profile}`;
+
   return (
-    <div style={{ maxWidth: 360, margin: "auto", fontFamily: "Arial, sans-serif" }}>
+    <div
+      style={{
+        maxWidth: 360,
+        margin: "auto",
+        fontFamily: "Arial, sans-serif",
+        padding: 10,
+      }}
+    >
       <h1 style={{ textAlign: "center" }}>Best Behaved Voting</h1>
 
       {!currentUser && (
@@ -146,7 +173,10 @@ export default function BehaviorPyramidApp() {
         <>
           <div style={{ marginBottom: 20 }}>
             <strong>You are:</strong> {currentUser}{" "}
-            <button onClick={() => setCurrentUser("")} style={{ marginLeft: 10 }}>
+            <button
+              onClick={() => setCurrentUser("")}
+              style={{ marginLeft: 10 }}
+            >
               Change
             </button>
           </div>
@@ -154,7 +184,7 @@ export default function BehaviorPyramidApp() {
           {/* Photo upload */}
           <div style={{ marginBottom: 20 }}>
             <img
-              src={photos[currentUser]}
+              src={getPhotoUrl(currentUser)}
               alt={currentUser}
               style={{
                 width: 100,
@@ -162,6 +192,7 @@ export default function BehaviorPyramidApp() {
                 borderRadius: "50%",
                 display: "block",
                 marginBottom: 8,
+                objectFit: "cover",
               }}
             />
             <input
@@ -214,13 +245,14 @@ export default function BehaviorPyramidApp() {
             <div>
               <div>
                 <img
-                  src={photos[ranking[0]]}
+                  src={getPhotoUrl(ranking[0])}
                   alt={ranking[0]}
                   style={{
                     width: 120,
                     height: 120,
                     borderRadius: "50%",
                     border: "4px solid gold",
+                    objectFit: "cover",
                   }}
                 />
                 <div style={{ fontWeight: "bold", marginTop: 6 }}>
@@ -239,13 +271,14 @@ export default function BehaviorPyramidApp() {
                 {[ranking[1], ranking[2]].map((p) => (
                   <div key={p}>
                     <img
-                      src={photos[p]}
+                      src={getPhotoUrl(p)}
                       alt={p}
                       style={{
                         width: 80,
                         height: 80,
                         borderRadius: "50%",
                         border: "2px solid gray",
+                        objectFit: "cover",
                       }}
                     />
                     <div>{p}</div>
@@ -276,21 +309,24 @@ export default function BehaviorPyramidApp() {
           <div style={{ marginTop: 40 }}>
             <h3>Past Pyramids History</h3>
             {history.length === 0 && <p>No past pyramids yet.</p>}
-            <ul>
+            <ul style={{ paddingLeft: 20 }}>
               {history.map(({ round, timestamp, ranking }) => (
                 <li key={round} style={{ marginBottom: 10 }}>
                   <strong>Pyramid {round}</strong> - <em>{timestamp}</em>
-                  <div style={{ display: "flex", marginTop: 5, gap: 10 }}>
+                  <div
+                    style={{ display: "flex", marginTop: 5, gap: 10 }}
+                  >
                     {ranking.map((p) => (
                       <img
                         key={p}
-                        src={photos[p]}
+                        src={getPhotoUrl(p)}
                         alt={p}
                         style={{
                           width: 40,
                           height: 40,
                           borderRadius: "50%",
                           border: "1px solid gray",
+                          objectFit: "cover",
                         }}
                       />
                     ))}
