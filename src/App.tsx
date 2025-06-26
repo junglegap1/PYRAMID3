@@ -34,7 +34,7 @@ export default function BehaviorPyramidApp() {
   const [votes, setVotes] = useState<VotesMap>({});
   const [history, setHistory] = useState<Pyramid[]>([]);
 
-  // 🔄 Load Firestore data
+  // 🔄 Load Firestore data on mount and listen for updates
   useEffect(() => {
     const unsubPhotos = onSnapshot(collection(db, "photos"), (snapshot) => {
       const data: PhotoMap = {};
@@ -74,7 +74,7 @@ export default function BehaviorPyramidApp() {
     };
   }, []);
 
-  // 📸 Upload photo
+  // 📸 Upload photo and save base64 string to Firestore
   const onPhotoChange = (profile: string, e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -91,6 +91,7 @@ export default function BehaviorPyramidApp() {
 
   const allVoted = profiles.every((p) => votes[p]);
 
+  // Compute ranking based on votes count
   const computeRanking = (): string[] => {
     const count: Record<string, number> = {};
     profiles.forEach((p) => (count[p] = 0));
@@ -102,6 +103,7 @@ export default function BehaviorPyramidApp() {
 
   const ranking = computeRanking();
 
+  // Handle voting logic
   const castVote = async (votedFor: string) => {
     if (!currentUser) return alert("Please select your profile first!");
     if (votedFor === currentUser)
@@ -118,6 +120,7 @@ export default function BehaviorPyramidApp() {
     await setDoc(doc(db, "votes", currentUser), { votedFor });
   };
 
+  // Start next round: save pyramid and clear votes
   const startNewRound = async () => {
     if (!allVoted) return alert("Everyone must vote first.");
     const newPyramid: Pyramid = {
@@ -201,6 +204,7 @@ export default function BehaviorPyramidApp() {
                     color: "white",
                     border: "none",
                     borderRadius: 4,
+                    cursor: votes[currentUser] === p ? "default" : "pointer",
                   }}
                 >
                   {p}
