@@ -1,12 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db, storage } from "./firebase"; // ← adjust the path if needed
 
 type ProfileName = "Nick" | "Charli" | "Shelma";
-
-const defaultPhotos: Record<ProfileName, string> = {
-  Nick: "https://i.pravatar.cc/100?img=1",
-  Charli: "https://i.pravatar.cc/100?img=2",
-  Shelma: "https://i.pravatar.cc/100?img=3",
-};
 
 const profiles: ProfileName[] = ["Nick", "Charli", "Shelma"];
 
@@ -19,62 +16,71 @@ type PyramidHistoryEntry = {
 };
 
 export default function BehaviorPyramidApp() {
-  // Load saved data from localStorage or init fresh
   const [currentUser, setCurrentUser] = useState<ProfileName | "">(
     (localStorage.getItem("bp-currentUser") as ProfileName) || ""
   );
 
-  const [photos, setPhotos] = useState<Record<ProfileName, string>>(() => {
-    const saved = localStorage.getItem("bp-photos");
-    return saved ? JSON.parse(saved) : defaultPhotos;
-  });
-
+  const [photos, setPhotos] = useState<Record<ProfileName, string>>({});
   const [votes, setVotes] = useState<Votes>(() => {
     const saved = localStorage.getItem("bp-votes");
     return saved ? JSON.parse(saved) : {};
   });
-
   const [history, setHistory] = useState<PyramidHistoryEntry[]>(() => {
     const saved = localStorage.getItem("bp-history");
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Save data back to localStorage on changes
+  // Load profile photos from Firestore
   useEffect(() => {
-    localStorage.setItem("bp-votes", JSON.stringify(votes));
-  }, [votes]);
-
-  useEffect(() => {
-    localStorage.setItem("bp-photos", JSON.stringify(photos));
-  }, [photos]);
+    const loadPhotos = async () => {
+      const docRef = doc(db, "photos", "profiles");
+      const snapshot = await getDoc(docRef);
+      if (snapshot.exists()) {
+        setPhotos(snapshot.data() as Record<ProfileName, string>);
+      } else {
+        // fallback avatars
+        setPhotos({
+          Nick: "https://i.pravatar.cc/100?img=1",
+          Charli: "https://i.pravatar.cc/100?img=2",
+          Shelma: "https://i.pravatar.cc/100?img=3",
+        });
+      }
+    };
+    loadPhotos();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("bp-currentUser", currentUser);
   }, [currentUser]);
 
   useEffect(() => {
+    localStorage.setItem("bp-votes", JSON.stringify(votes));
+  }, [votes]);
+
+  useEffect(() => {
     localStorage.setItem("bp-history", JSON.stringify(history));
   }, [history]);
 
-  // Handle photo upload for profile
-  const onPhotoChange = (
+  const onPhotoChange = async (
     profile: ProfileName,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPhotos((p) => ({ ...p, [profile]: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileRef = ref(storage, `profile_photos/${profile}.jpg`);
+    await uploadBytes(fileRef, file);
+    const downloadURL = await getDownloadURL(fileRef);
+
+    const updatedPhotos = { ...photos, [profile]: downloadURL };
+    setPhotos(updatedPhotos);
+
+    // save new URL to Firestore
+    await setDoc(doc(db, "photos", "profiles"), updatedPhotos);
   };
 
-  // Check if all profiles have voted this round
   const allVoted = profiles.every((p) => votes[p]);
 
-  // Compute current ranking based on votes
   const computeRanking = (): ProfileName[] => {
     const count: Record<ProfileName, number> = {
       Nick: 0,
@@ -89,16 +95,9 @@ export default function BehaviorPyramidApp() {
 
   const ranking = computeRanking();
 
-  // Cast vote for current user
   const castVote = (votedFor: ProfileName) => {
-    if (!currentUser) {
-      alert("Please select your profile first!");
-      return;
-    }
-    if (votedFor === currentUser) {
-      alert("You cannot vote for yourself!");
-      return;
-    }
+    if (!currentUser) return alert("Please select your profile first!");
+    if (votedFor === currentUser) return alert("You cannot vote for yourself!");
     if (votes[currentUser]) {
       if (
         !window.confirm(
@@ -110,7 +109,6 @@ export default function BehaviorPyramidApp() {
     setVotes((v) => ({ ...v, [currentUser]: votedFor }));
   };
 
-  // Save current pyramid and start new round
   const startNewRound = () => {
     if (!allVoted) {
       alert("All profiles must vote before starting a new round.");
@@ -126,12 +124,9 @@ export default function BehaviorPyramidApp() {
   };
 
   return (
-    <div
-      style={{ maxWidth: 360, margin: "auto", fontFamily: "Arial, sans-serif" }}
-    >
+    <div style={{ maxWidth: 360, margin: "auto", fontFamily: "Arial, sans-serif" }}>
       <h1 style={{ textAlign: "center" }}>Best Behaved Voting</h1>
 
-      {/* Profile selector */}
       {!currentUser && (
         <div style={{ marginBottom: 16 }}>
           <h3>Select Your Profile</h3>
@@ -176,7 +171,6 @@ export default function BehaviorPyramidApp() {
             />
           </div>
 
-          {/* Voting */}
           <div>
             <h3>Vote for the Best Behaved</h3>
             {profiles
@@ -208,7 +202,6 @@ export default function BehaviorPyramidApp() {
             )}
           </div>
 
-          {/* Current pyramid info */}
           <div style={{ marginTop: 30, textAlign: "center" }}>
             <h3>
               Current Pyramid {history.length + 1}{" "}
@@ -219,7 +212,6 @@ export default function BehaviorPyramidApp() {
 
             {/* Pyramid display */}
             <div>
-              {/* Top */}
               <div>
                 <img
                   src={photos[ranking[0]]}
@@ -236,7 +228,6 @@ export default function BehaviorPyramidApp() {
                 </div>
               </div>
 
-              {/* Bottom row */}
               <div
                 style={{
                   marginTop: 20,
@@ -263,7 +254,6 @@ export default function BehaviorPyramidApp() {
               </div>
             </div>
 
-            {/* Start new round button */}
             <div style={{ marginTop: 20 }}>
               <button
                 onClick={startNewRound}
