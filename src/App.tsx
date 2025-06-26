@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from "react";
 
+type PhotosType = {
+  [key: string]: string | ArrayBuffer | null;
+};
+
 const defaultPhotos = {
   Nick: "https://i.pravatar.cc/100?img=1",
   Charli: "https://i.pravatar.cc/100?img=2",
@@ -13,7 +17,7 @@ export default function BehaviorPyramidApp() {
   const [currentUser, setCurrentUser] = useState(
     localStorage.getItem("bp-currentUser") || ""
   );
-  const [photos, setPhotos] = useState(() => {
+  const [photos, setPhotos] = useState<PhotosType>(() => {
     const saved = localStorage.getItem("bp-photos");
     return saved ? JSON.parse(saved) : defaultPhotos;
   });
@@ -41,13 +45,16 @@ export default function BehaviorPyramidApp() {
   }, [history]);
 
   // Handle photo upload for profile
-  const onPhotoChange = (profile: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPhotoChange = (
+    profile: string,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = e.target.files;
-if (!files || files.length === 0) return;
-const file = files[0];
+    if (!files || files.length === 0) return;
+    const file = files[0];
     const reader = new FileReader();
     reader.onloadend = () => {
-      setPhotos((p) => ({ ...p, [profile]: reader.result }));
+      setPhotos((p: PhotosType) => ({ ...p, [profile]: reader.result }));
     };
     reader.readAsDataURL(file);
   };
@@ -57,7 +64,7 @@ const file = files[0];
 
   // Compute current ranking based on votes
   const computeRanking = () => {
-    const count = {};
+    const count: { [key: string]: number } = {};
     profiles.forEach((p) => (count[p] = 0));
     Object.values(votes).forEach((v) => {
       if (count[v] !== undefined) count[v]++;
@@ -67,7 +74,7 @@ const file = files[0];
   const ranking = computeRanking();
 
   // Cast vote for current user
-  const castVote = (votedFor) => {
+  const castVote = (votedFor: string) => {
     if (!currentUser) {
       alert("Please select your profile first!");
       return;
@@ -103,9 +110,7 @@ const file = files[0];
   };
 
   return (
-    <div
-      style={{ maxWidth: 360, margin: "auto", fontFamily: "Arial, sans-serif" }}
-    >
+    <div style={{ maxWidth: 360, margin: "auto", fontFamily: "Arial, sans-serif" }}>
       <h1 style={{ textAlign: "center" }}>Best Behaved Voting</h1>
 
       {/* Profile selector */}
@@ -128,10 +133,7 @@ const file = files[0];
         <>
           <div style={{ marginBottom: 20 }}>
             <strong>You are:</strong> {currentUser}{" "}
-            <button
-              onClick={() => setCurrentUser("")}
-              style={{ marginLeft: 10 }}
-            >
+            <button onClick={() => setCurrentUser("")} style={{ marginLeft: 10 }}>
               Change
             </button>
           </div>
@@ -139,7 +141,7 @@ const file = files[0];
           {/* Photo upload */}
           <div style={{ marginBottom: 20 }}>
             <img
-              src={photos[currentUser]}
+              src={photos[currentUser] as string}
               alt={currentUser}
               style={{
                 width: 100,
@@ -170,8 +172,7 @@ const file = files[0];
                     marginRight: 8,
                     marginBottom: 8,
                     padding: "8px 16px",
-                    backgroundColor:
-                      votes[currentUser] === p ? "green" : "gray",
+                    backgroundColor: votes[currentUser] === p ? "green" : "gray",
                     color: "white",
                     cursor: votes[currentUser] === p ? "default" : "pointer",
                     border: "none",
@@ -202,7 +203,7 @@ const file = files[0];
               {/* Top */}
               <div>
                 <img
-                  src={photos[ranking[0]]}
+                  src={photos[ranking[0]] as string}
                   alt={ranking[0]}
                   style={{
                     width: 120,
@@ -211,9 +212,7 @@ const file = files[0];
                     border: "4px solid gold",
                   }}
                 />
-                <div style={{ fontWeight: "bold", marginTop: 6 }}>
-                  {ranking[0]}
-                </div>
+                <div style={{ fontWeight: "bold", marginTop: 6 }}>{ranking[0]}</div>
               </div>
 
               {/* Bottom row */}
@@ -228,7 +227,7 @@ const file = files[0];
                 {[ranking[1], ranking[2]].map((p) => (
                   <div key={p}>
                     <img
-                      src={photos[p]}
+                      src={photos[p] as string}
                       alt={p}
                       style={{
                         width: 80,
@@ -274,7 +273,7 @@ const file = files[0];
                     {/* Show pyramid with photos */}
                     <div style={{ textAlign: "center" }}>
                       <img
-                        src={photos[ranking[0]]}
+                        src={photos[ranking[0]] as string}
                         alt={ranking[0]}
                         style={{
                           width: 60,
@@ -290,7 +289,7 @@ const file = files[0];
                     {[ranking[1], ranking[2]].map((p) => (
                       <div key={p} style={{ textAlign: "center" }}>
                         <img
-                          src={photos[p]}
+                          src={photos[p] as string}
                           alt={p}
                           style={{
                             width: 40,
